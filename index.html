@@ -1,262 +1,144 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>本桌记录系统（云端记忆）</title>
-
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <style>
-    body { background:#f1f5f9; }
-    .cell { width: 44px; height: 44px; }
-    .cell-empty { background:#e5e7eb; }
-    .cell-b { background:#4f46e5; color:#fff; }
-    .cell-p { background:#ec4899; color:#fff; }
-  </style>
-</head>
-
-<body class="min-h-screen py-6">
-  <div class="max-w-4xl mx-auto px-4">
-    <div class="bg-white rounded-xl shadow p-5">
-      <div class="flex items-center justify-between">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800">本桌记录系统（云端记忆）</h1>
-        <span id="statusBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
-          未连接数据库
-        </span>
-      </div>
-
-      <div class="mt-3 text-sm text-gray-600 leading-relaxed">
-        说明：界面只显示你本桌输入的手数（最多 60 手）。数据库会一直累计历史数据，但不会显示在界面上。
-      </div>
-
-      <div class="mt-4 flex flex-wrap gap-3 items-center">
-        <button id="btnConnect" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700">
-          连接数据库
-        </button>
-        <button id="btnResetTable" class="px-4 py-2 rounded-lg bg-gray-600 text-white font-bold hover:bg-gray-700">
-          清空本桌
-        </button>
-
-        <div class="text-sm text-gray-700">
-          本桌已输入：<span id="roundCount" class="font-bold">0</span> / 60
-        </div>
-      </div>
-
-      <div class="mt-5">
-        <div class="text-sm font-bold text-gray-700 mb-2">本桌记录（10×6，共60格）</div>
-        <div id="grid" class="grid grid-cols-10 gap-2"></div>
-      </div>
-
-      <div class="mt-5 flex flex-wrap gap-3">
-        <button id="btnB" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700">
-          庄（B）
-        </button>
-        <button id="btnP" class="px-4 py-2 rounded-lg bg-pink-500 text-white font-bold hover:bg-pink-600">
-          闲（P）
-        </button>
-        <button id="btnUndo" class="px-4 py-2 rounded-lg bg-gray-600 text-white font-bold hover:bg-gray-700">
-          撤销最后一手
-        </button>
-        <button id="btnHint" class="px-4 py-2 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700">
-          统计提示（不保证准确）
-        </button>
-      </div>
-
-      <div class="mt-4 bg-gray-50 rounded-xl p-4">
-        <div class="text-sm text-gray-700 font-bold mb-1">提示区</div>
-        <div id="mainHint" class="text-lg font-bold text-gray-500">等待输入…</div>
-        <div id="subHint" class="text-sm text-gray-600 mt-1">本桌统计：--</div>
-      </div>
-
-      <div class="mt-4 text-xs text-gray-500 text-center">
-        仅用于记录与统计展示，不承诺任何结果。
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ====== 你的 Supabase 信息（已填好）======
-    const SUPABASE_URL = "https://nljvpnmcnzeibosrtnlp.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_zvkqWardciRVVm4PpzU6Lg_FTZbeqJ3";
-    const TABLE_NAME = "baccarat_history"; // 你的表名：如果你实际表名不是这个，就改这里
-
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // ====== 页面元素 ======
-    const statusBadge = document.getElementById("statusBadge");
-    const btnConnect = document.getElementById("btnConnect");
-    const btnResetTable = document.getElementById("btnResetTable");
-
-    const grid = document.getElementById("grid");
-    const roundCount = document.getElementById("roundCount");
-
-    const btnB = document.getElementById("btnB");
-    const btnP = document.getElementById("btnP");
-    const btnUndo = document.getElementById("btnUndo");
-    const btnHint = document.getElementById("btnHint");
-
-    const mainHint = document.getElementById("mainHint");
-    const subHint = document.getElementById("subHint");
-
-    // ====== 本桌数据（只显示这个）======
-    const MAX_ROUNDS = 60;
-    let isConnected = false;
-    let tableRounds = []; // 只存本桌 B/P
-
-    // 初始化 60 个格子
-    function initGrid() {
-      grid.innerHTML = "";
-      for (let i = 0; i < MAX_ROUNDS; i++) {
-        const cell = document.createElement("div");
-        cell.className = "cell rounded flex items-center justify-center font-black cell-empty";
-        cell.textContent = "";
-        grid.appendChild(cell);
-      }
-    }
-
-    function renderGrid() {
-      const cells = grid.querySelectorAll("div");
-      cells.forEach((cell, idx) => {
-        const v = tableRounds[idx];
-        if (v === "B") {
-          cell.className = "cell rounded flex items-center justify-center font-black cell-b";
-          cell.textContent = "B";
-        } else if (v === "P") {
-          cell.className = "cell rounded flex items-center justify-center font-black cell-p";
-          cell.textContent = "P";
-        } else {
-          cell.className = "cell rounded flex items-center justify-center font-black cell-empty";
-          cell.textContent = "";
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>百家乐预测系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* 样式部分 */
+        :root {
+            --primary: #4f46e5;
+            --secondary: #ec4899;
+            --dark: #1e293b;
+            --light: #f8fafc;
         }
-      });
 
-      roundCount.textContent = String(tableRounds.length);
-    }
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: var(--light);
+        }
 
-    function setConnectedUI(ok) {
-      isConnected = ok;
-      if (ok) {
-        statusBadge.textContent = "已连接数据库";
-        statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700";
-        btnConnect.textContent = "已连接";
-        btnConnect.className = "px-4 py-2 rounded-lg bg-green-600 text-white font-bold";
-      } else {
-        statusBadge.textContent = "未连接数据库";
-        statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700";
-        btnConnect.textContent = "连接数据库";
-        btnConnect.className = "px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700";
-      }
-    }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-    // 连接数据库：只做“验证能不能读表”，不加载历史到界面！
-    async function connectDB() {
-      btnConnect.disabled = true;
-      btnConnect.textContent = "连接中…";
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
 
-      try {
-        // 只要能 select 到，就算连接成功（不把历史塞进界面）
-        const { error } = await supabase.from(TABLE_NAME).select("id").limit(1);
-        if (error) throw error;
+        .grid-item {
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 18px;
+        }
 
-        setConnectedUI(true);
-        mainHint.textContent = "连接成功：本桌从 0 开始输入";
-        mainHint.className = "text-lg font-bold text-green-700";
-        subHint.textContent = "提示：数据库会后台累计历史，但界面只显示本桌。";
-      } catch (e) {
-        setConnectedUI(false);
-        alert("连接失败：" + (e?.message || e));
-      } finally {
-        btnConnect.disabled = false;
-        if (!isConnected) btnConnect.textContent = "连接数据库";
-      }
-    }
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
 
-    // 写入数据库（后台记忆库）：只插入一条，不回读历史
-    async function insertToDB(result) {
-      const { error } = await supabase.from(TABLE_NAME).insert({ result });
-      if (error) throw error;
-    }
+        .btn:hover {
+            background-color: var(--secondary);
+        }
+    </style>
+</head>
+<body>
 
-    // 输入一手：界面+1，同时后台写库（失败不影响你继续玩）
-    async function addRound(v) {
-      if (!isConnected) {
-        alert("请先连接数据库");
-        return;
-      }
-      if (tableRounds.length >= MAX_ROUNDS) {
-        alert("本桌最多 60 手");
-        return;
-      }
+<div class="container">
+    <h1 class="text-center text-4xl mb-8">百家乐预测系统</h1>
 
-      tableRounds.push(v);
-      renderGrid();
+    <!-- 用户输入历史数据 -->
+    <div class="grid" id="dataTable"></div>
 
-      // 后台写库（不回填历史）
-      try {
-        await insertToDB(v);
-      } catch (e) {
-        alert("写入数据库失败：" + (e?.message || e));
-      }
-    }
+    <!-- 控制按钮 -->
+    <div class="flex justify-center space-x-4">
+        <button class="btn" onclick="predict()">预测</button>
+        <button class="btn" onclick="reset()">重置</button>
+    </div>
 
-    function undoRound() {
-      if (tableRounds.length === 0) return;
-      tableRounds.pop();
-      renderGrid();
-    }
+    <!-- 显示预测结果 -->
+    <div id="predictionResult" class="mt-8 text-center text-2xl"></div>
 
-    function resetTableOnly() {
-      tableRounds = [];
-      renderGrid();
-      mainHint.textContent = "本桌已清空";
-      mainHint.className = "text-lg font-bold text-gray-600";
-      subHint.textContent = "你可以重新从第 1 手开始输入。";
-    }
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // 模拟数据库中的所有历史数据（实际数据来自数据库）
+            const allHistoryData = [
+                { id: 1, result: 'B' },
+                { id: 2, result: 'P' },
+                { id: 3, result: 'B' },
+                { id: 4, result: 'P' },
+                { id: 5, result: 'B' },
+                { id: 6, result: 'P' },
+                { id: 7, result: 'B' },
+                { id: 8, result: 'P' },
+                { id: 9, result: 'B' },
+                { id: 10, result: 'P' },
+                { id: 11, result: 'B' },
+                { id: 12, result: 'P' },
+                // 更多历史数据...
+            ];
 
-    async function showHint() {
-      if (tableRounds.length < 5) {
-        alert("本桌至少输入 5 手再看统计提示");
-        return;
-      }
+            // 显示的历史数据条数（用户输入的前几条数据）
+            const numToShow = 10;
 
-      btnHint.disabled = true;
-      btnHint.textContent = "分析中…";
-      mainHint.textContent = "分析中…";
-      mainHint.className = "text-lg font-bold text-indigo-700";
-      subHint.textContent = "正在统计本桌数据…";
+            // 只显示前 numToShow 条数据
+            const visibleData = allHistoryData.slice(0, numToShow);
 
-      // 模拟分析延迟（你之前说的“先分析中再出结果”）
-      await new Promise(r => setTimeout(r, 1200));
+            // 更新网页上显示的数据
+            displayDataOnPage(visibleData);
 
-      const lastN = tableRounds.slice(-30);
-      const b = lastN.filter(x => x === "B").length;
-      const p = lastN.filter(x => x === "P").length;
+            // 显示数据到页面
+            function displayDataOnPage(data) {
+                const table = document.getElementById('dataTable'); // 假设你有一个ID为dataTable的表格
+                table.innerHTML = ''; // 清空表格
+                data.forEach(row => {
+                    let newRow = table.insertRow();
+                    let cell1 = newRow.insertCell(0);
+                    cell1.innerHTML = row.id;
+                    let cell2 = newRow.insertCell(1);
+                    cell2.innerHTML = row.result;
+                });
+            }
 
-      // 这里只做“统计提示”，不承诺准确，不做赌博保证
-      const tip = (b >= p) ? "本桌近况：庄偏多（仅统计提示）" : "本桌近况：闲偏多（仅统计提示）";
-      mainHint.textContent = tip;
-      mainHint.className = "text-lg font-bold text-gray-800";
-      subHint.textContent = `本桌最近${lastN.length}手统计：庄 ${b} / 闲 ${p}（不保证准确）`;
+            // 假设你调用后端API进行预测
+            function predict() {
+                // 使用数据库中的所有历史数据进行预测（后端不受前端显示数据限制）
+                const predictionResult = predictWithAllData(allHistoryData);
+                displayPredictionResult(predictionResult);
+            }
 
-      btnHint.disabled = false;
-      btnHint.textContent = "统计提示（不保证准确）";
-    }
+            // 使用所有历史数据进行预测
+            function predictWithAllData(data) {
+                // 假设你在这里调用数据库API进行预测
+                // 此处模拟预测结果
+                return 'P'; // 示例：预测结果为P
+            }
 
-    // 绑定事件
-    btnConnect.addEventListener("click", connectDB);
-    btnResetTable.addEventListener("click", resetTableOnly);
+            // 显示预测结果
+            function displayPredictionResult(result) {
+                const predictionElement = document.getElementById('predictionResult');
+                predictionElement.innerText = `预测结果: ${result}`;
+            }
 
-    btnB.addEventListener("click", () => addRound("B"));
-    btnP.addEventListener("click", () => addRound("P"));
-    btnUndo.addEventListener("click", undoRound);
-    btnHint.addEventListener("click", showHint);
+            // 重置页面
+            function reset() {
+                displayDataOnPage([]); // 清空显示的数据
+                document.getElementById('predictionResult').innerText = ''; // 清空预测结果
+            }
+        });
+    </script>
+</div>
 
-    // 初始化：不读数据库历史！界面从0开始
-    initGrid();
-    renderGrid();
-    setConnectedUI(false);
-  </script>
 </body>
 </html>
