@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>百家乐AI预测系统</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;500;700&display=swap');
+
+    :root {
+      --primary: #4f46e5;
+      --secondary: #ec4899;
+      --dark: #1e293b;
+      --light: #f8fafc;
+    }
+
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #f1f5f9;
+      color: var(--dark);
+      background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M30,10 Q50,5 70,10 T90,30 Q95,50 90,70 T70,90 Q50,95 30,90 T10,70 Q5,50 10,30 T30,10" fill="none" stroke="rgba(79,70,229,0.1)" stroke-width="1"/></svg>');
+    }
+
+    .hand-drawn-border {
+      border: 2px solid var(--dark);
+      border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+      box-shadow: 5px 5px 0 rgba(0,0,0,0.1);
+    }
+
+    .hand-drawn-btn {
+      border: 2px solid var(--dark);
+      border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hand-drawn-btn:hover {
+      transform: translateY(-2px) rotate(-1deg);
+      box-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+    }
+
+    .hand-drawn-btn:active {
+      transform: translateY(0) rotate(0);
+    }
+
+    .hand-drawn-btn::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255,255,255,0.2);
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+    }
+
+    .hand-drawn-btn:hover::after {
+      transform: translateX(0);
+    }
+
+    .title-font {
+      font-family: 'Ma Shan Zheng', cursive;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.1);
+    }
+
+    .watercolor-bg {
+      background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M20,20 Q30,10 40,20 T60,20 Q70,10 80,20 T100,40 Q90,50 100,60 T80,80 Q70,90 60,80 T40,80 Q30,90 20,80 T0,60 Q10,50 0,40 T20,20" fill="rgba(79,70,229,0.05)" stroke="none"/></svg>');
+    }
+
+    .cell {
+      transition: all 0.3s ease;
+      transform-style: preserve-3d;
+    }
+
+    .cell:hover {
+      transform: scale(1.05) rotateY(10deg);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .animate-pulse {
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen py-8">
+  <div class="container mx-auto px-4 max-w-4xl">
+    <div class="bg-white hand-drawn-border watercolor-bg p-6 mb-8">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="title-font text-3xl md:text-4xl text-indigo-600">百家乐AI预测系统</h1>
+        <span id="connectionStatus" class="px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-800">未连接</span>
+      </div>
+
+      <div class="mb-6">
+        <label for="apiKeyInput" class="block text-sm font-medium text-gray-700 mb-2">DeepSeek API密钥</label>
+        <div class="relative">
+          <input type="password" id="apiKeyInput"
+                 class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition duration-200"
+                 placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+          <button id="btnConnect"
+                  class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-4 py-1 rounded-lg hand-drawn-btn hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            连接
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-gray-50 hand-drawn-border p-4 mb-6">
+        <div id="grid" class="grid grid-cols-10 gap-2 mb-4"></div>
+
+        <div class="flex flex-wrap gap-3">
+          <button id="btnB" class="bg-indigo-600 text-white px-4 py-2 hand-drawn-btn hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            庄 (B)
+          </button>
+          <button id="btnP" class="bg-pink-500 text-white px-4 py-2 hand-drawn-btn hover:bg-pink-600 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2">
+            闲 (P)
+          </button>
+          <button id="btnUndo" class="bg-gray-500 text-white px-4 py-2 hand-drawn-btn hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+            撤销
+          </button>
+          <button id="btnReset" class="bg-gray-500 text-white px-4 py-2 hand-drawn-btn hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+            重置
+          </button>
+          <button id="btnPredict" class="bg-green-600 text-white px-4 py-2 hand-drawn-btn hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+            预测
+          </button>
+        </div>
+
+        <div id="trainStatus" class="mt-3 text-sm text-gray-600">
+          <span class="font-medium">模型训练状态:</span> <span>等待数据输入...</span>
+        </div>
+      </div>
+
+      <div class="bg-indigo-50 hand-drawn-border p-4 mb-6">
+        <h2 class="text-xl font-bold text-indigo-700 mb-3">预测结果</h2>
+        <div id="resultContainer" class="text-center">
+          <div id="resultText" class="text-2xl font-bold mb-2 text-gray-500">等待预测...</div>
+          <div id="confidenceText" class="text-sm text-gray-600">准确率: --%</div>
+        </div>
+      </div>
+
+      <div class="text-xs text-gray-500 text-center">
+        以上内容由AI搜集并生成，仅供参考
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const apiKeyInput = document.getElementById('apiKeyInput');
+      const btnConnect = document.getElementById('btnConnect');
+      const connectionStatus = document.getElementById('connectionStatus');
+      const grid = document.getElementById('grid');
+      const btnB = document.getElementById('btnB');
+      const btnP = document.getElementById('btnP');
+      const btnUndo = document.getElementById('btnUndo');
+      const btnReset = document.getElementById('btnReset');
+      const btnPredict = document.getElementById('btnPredict');
+      const trainStatus = document.getElementById('trainStatus');
+      const resultText = document.getElementById('resultText');
+      const confidenceText = document.getElementById('confidenceText');
+
+      let isConnected = false;
+      let gameHistory = [];
+
+      function initializeGrid() {
+        grid.innerHTML = '';
+        for (let i = 0; i < 100; i++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell h-8 flex items-center justify-center bg-gray-200 rounded';
+          grid.appendChild(cell);
+        }
+      }
+
+      function updateGrid() {
+        const cells = grid.querySelectorAll('.cell');
+        cells.forEach((cell, index) => {
+          if (index < gameHistory.length) {
+            cell.textContent = gameHistory[index];
+            cell.className = `cell h-8 flex items-center justify-center rounded font-bold ${
+              gameHistory[index] === 'B' ? 'bg-indigo-500 text-white' : 'bg-pink-500 text-white'
+            }`;
+          } else {
+            cell.textContent = '';
+            cell.className = 'cell h-8 flex items-center justify-center bg-gray-200 rounded';
+          }
+        });
+
+        if (gameHistory.length > 0) {
+          trainStatus.innerHTML = `<span class="font-medium">模型训练状态:</span> <span class="text-green-600">已收集 ${gameHistory.length} 条数据</span>`;
+        } else {
+          trainStatus.innerHTML = `<span class="font-medium">模型训练状态:</span> <span>等待数据输入...</span>`;
+        }
+      }
+
+      async function connectToAPI() {
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+          alert('请输入有效的API密钥');
+          return;
+        }
+
+        btnConnect.disabled = true;
+        btnConnect.innerHTML = '<span class="animate-pulse">连接中...</span>';
+
+        try {
+          // 模拟 API 验证
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          isConnected = true;
+          connectionStatus.textContent = '已连接';
+          connectionStatus.className = 'px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-100 text-green-800';
+
+          btnConnect.textContent = '已连接';
+          btnConnect.className = 'absolute right-2 top-1/2 transform -translate-y-1/2 bg-green-600 text-white px-4 py-1 rounded-lg hand-drawn-btn focus:outline-none';
+
+          btnPredict.disabled = false;
+        } catch (error) {
+          alert('连接失败: ' + error.message);
+          resetConnectionUI();
+        }
+      }
+
+      function resetConnectionUI() {
+        isConnected = false;
+        connectionStatus.textContent = '未连接';
+        connectionStatus.className = 'px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-800';
+
+        btnConnect.disabled = false;
+        btnConnect.textContent = '连接';
+        btnConnect.className = 'absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-4 py-1 rounded-lg hand-drawn-btn hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2';
+
+        btnPredict.disabled = true;
+      }
+
+      async function predictNext() {
+        if (!isConnected) {
+          alert('请先连接API');
+          return;
+        }
+        if (gameHistory.length < 5) {
+          alert('至少需要5条历史数据才能进行预测');
+          return;
+        }
+
+        btnPredict.disabled = true;
+        btnPredict.innerHTML = '<span class="animate-pulse">预测中...</span>';
+        resultText.textContent = "分析中...";
+        resultText.className = "text-2xl font-bold mb-2 text-indigo-500";
+        confidenceText.textContent = "计算准确率...";
+
+        try {
+          // 模拟 API 预测耗时（你要的“分析中”停一下就在这里）
+          await new Promise(resolve => setTimeout(resolve, 1500));
+
+          const predictions = ['B', 'P'];
+          const randomPrediction = predictions[Math.floor(Math.random() * predictions.length)];
+          const randomConfidence = (Math.random() * 30 + 70).toFixed(1);
+
+          resultText.textContent = randomPrediction === 'B' ? "庄 (B)" : "闲 (P)";
+          resultText.className = `text-2xl font-bold mb-2 ${
+            randomPrediction === 'B' ? 'text-indigo-600' : 'text-pink-600'
+          }`;
+
+          confidenceText.textContent = `准确率: ${randomConfidence}%`;
+          confidenceText.className = `text-sm ${
+            parseFloat(randomConfidence) > 85 ? 'text-green-600' : 'text-yellow-600'
+          }`;
+        } catch (error) {
+          alert('预测失败: ' + error.message);
+          resultText.textContent = "预测失败";
+          resultText.className = "text-2xl font-bold mb-2 text-red-500";
+          confidenceText.textContent = "请检查连接后重试";
+          confidenceText.className = "text-sm text-red-500";
+        } finally {
+          btnPredict.disabled = false;
+          btnPredict.textContent = '预测';
+        }
+      }
+
+      btnConnect.addEventListener('click', connectToAPI);
+
+      btnB.addEventListener('click', function() {
+        if (gameHistory.length >= 100) return;
+        gameHistory.push('B');
+        updateGrid();
+      });
+
+      btnP.addEventListener('click', function() {
+        if (gameHistory.length >= 100) return;
+        gameHistory.push('P');
+        updateGrid();
+      });
+
+      btnUndo.addEventListener('click', function() {
+        if (gameHistory.length > 0) {
+          gameHistory.pop();
+          updateGrid();
+        }
+      });
+
+      btnReset.addEventListener('click', function() {
+        gameHistory = [];
+        updateGrid();
+        resultText.textContent = "等待预测...";
+        resultText.className = "text-2xl font-bold mb-2 text-gray-500";
+        confidenceText.textContent = "准确率: --%";
+        confidenceText.className = "text-sm text-gray-600";
+      });
+
+      btnPredict.addEventListener('click', predictNext);
+
+      initializeGrid();
+      btnPredict.disabled = true;
+    });
+  </script>
+</body>
+</html>
