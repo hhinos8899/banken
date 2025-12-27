@@ -251,7 +251,7 @@
           .from(TABLE_NAME)
           .select('id,result,created_at')
           .order('id', { ascending: true })
-          .limit(100);
+          .limit(1000);
 
         if (error) throw error;
 
