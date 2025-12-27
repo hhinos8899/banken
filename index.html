@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>百家乐AI预测系统</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;500;700&display=swap');
 
@@ -20,7 +19,7 @@
       font-family: 'Noto Sans SC', sans-serif;
       background-color: #f1f5f9;
       color: var(--dark);
-      background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M30,10 Q50,5 70,10 T90,30 Q95,50 90,70 T70,90 Q50,95 30,90 T10,70 Q5,50 10,30 T30,10" fill="none" stroke="rgba(79,70,229,0.1)" stroke-width="1"/></svg>');
+      background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path  d="M30,10 Q50,5 70,10 T90,30 Q95,50 90,70 T70,90 Q50,95 30,90 T10,70 Q5,50 10,30 T30,10" fill="none" stroke="rgba(79,70,229,0.1)" stroke-width="1"/></svg>');
     }
 
     .hand-drawn-border {
@@ -68,7 +67,7 @@
     }
 
     .watercolor-bg {
-      background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M20,20 Q30,10 40,20 T60,20 Q70,10 80,20 T100,40 Q90,50 100,60 T80,80 Q70,90 60,80 T40,80 Q30,90 20,80 T0,60 Q10,50 0,40 T20,20" fill="rgba(79,70,229,0.05)" stroke="none"/></svg>');
+      background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path  d="M20,20 Q30,10 40,20 T60,20 Q70,10 80,20 T100,40 Q90,50 100,60 T80,80 Q70,90 60,80 T40,80 Q30,90 20,80 T0,60 Q10,50 0,40 T20,20" fill="rgba(79,70,229,0.05)" stroke="none"/></svg>');
     }
 
     .cell {
@@ -89,6 +88,9 @@
       animation: pulse 2s infinite;
     }
   </style>
+
+  <!-- Supabase JS（必须） -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body class="min-h-screen py-8">
@@ -100,15 +102,18 @@
       </div>
 
       <div class="mb-6">
-        <label for="apiKeyInput" class="block text-sm font-medium text-gray-700 mb-2">DeepSeek API密钥</label>
+        <label for="apiKeyInput" class="block text-sm font-medium text-gray-700 mb-2">Supabase 公共密钥（可不填）</label>
         <div class="relative">
           <input type="password" id="apiKeyInput"
                  class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition duration-200"
-                 placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                 placeholder="不填也可以（已内置），填了会优先使用">
           <button id="btnConnect"
                   class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-4 py-1 rounded-lg hand-drawn-btn hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
             连接
           </button>
+        </div>
+        <div class="text-xs text-gray-500 mt-2">
+          说明：这里连接的是 Supabase 数据库，用来“记忆/加载历史记录”。（不是赌博必胜预测）
         </div>
       </div>
 
@@ -134,26 +139,35 @@
         </div>
 
         <div id="trainStatus" class="mt-3 text-sm text-gray-600">
-          <span class="font-medium">模型训练状态:</span> <span>等待数据输入...</span>
+          <span class="font-medium">数据状态:</span> <span>等待连接数据库...</span>
         </div>
       </div>
 
       <div class="bg-indigo-50 hand-drawn-border p-4 mb-6">
-        <h2 class="text-xl font-bold text-indigo-700 mb-3">预测结果</h2>
+        <h2 class="text-xl font-bold text-indigo-700 mb-3">结果 / 提示</h2>
         <div id="resultContainer" class="text-center">
-          <div id="resultText" class="text-2xl font-bold mb-2 text-gray-500">等待预测...</div>
-          <div id="confidenceText" class="text-sm text-gray-600">准确率: --%</div>
+          <div id="resultText" class="text-2xl font-bold mb-2 text-gray-500">等待操作...</div>
+          <div id="confidenceText" class="text-sm text-gray-600">统计: --</div>
         </div>
       </div>
 
       <div class="text-xs text-gray-500 text-center">
-        以上内容由AI搜集并生成，仅供参考
+        说明：本页面只做“记录 + 统计提示”，不保证也无法保证赌博结果可被准确预测。
       </div>
     </div>
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
+      // ====== 你的 Supabase 信息（已按你发的填好）======
+      const SUPABASE_URL_DEFAULT = "https://nljvpnmcnzeibosrtnlp.supabase.co";
+      const SUPABASE_KEY_DEFAULT = "sb_publishable_zvkqWardciRVVm4PpzU6Lg_FTZbeqJ3";
+
+      // 你的表名 & 字段名（必须与 Supabase 一致）
+      const TABLE_NAME = "baccarat_history";
+      const COL_RESULT = "result";
+
+      // ====== DOM ======
       const apiKeyInput = document.getElementById('apiKeyInput');
       const btnConnect = document.getElementById('btnConnect');
       const connectionStatus = document.getElementById('connectionStatus');
@@ -167,9 +181,12 @@
       const resultText = document.getElementById('resultText');
       const confidenceText = document.getElementById('confidenceText');
 
+      // ====== 状态 ======
       let isConnected = false;
-      let gameHistory = [];
+      let gameHistory = [];      // 只放 B/P
+      let supabaseClient = null; // 连接后才创建
 
+      // ====== UI：网格 ======
       function initializeGrid() {
         grid.innerHTML = '';
         for (let i = 0; i < 100; i++) {
@@ -183,9 +200,11 @@
         const cells = grid.querySelectorAll('.cell');
         cells.forEach((cell, index) => {
           if (index < gameHistory.length) {
-            cell.textContent = gameHistory[index];
-            cell.className = `cell h-8 flex items-center justify-center rounded font-bold ${
-              gameHistory[index] === 'B' ? 'bg-indigo-500 text-white' : 'bg-pink-500 text-white'
+            const v = gameHistory[index];
+            cell.textContent = v;
+            cell.className = `cell h-8 flex items-center justify-center rounded font-bold ${v === 'B'
+              ? 'bg-indigo-500 text-white'
+              : 'bg-pink-500 text-white'
             }`;
           } else {
             cell.textContent = '';
@@ -193,26 +212,80 @@
           }
         });
 
-        if (gameHistory.length > 0) {
-          trainStatus.innerHTML = `<span class="font-medium">模型训练状态:</span> <span class="text-green-600">已收集 ${gameHistory.length} 条数据</span>`;
-        } else {
-          trainStatus.innerHTML = `<span class="font-medium">模型训练状态:</span> <span>等待数据输入...</span>`;
-        }
-      }
-
-      async function connectToAPI() {
-        const apiKey = apiKeyInput.value.trim();
-        if (!apiKey) {
-          alert('请输入有效的API密钥');
+        if (!isConnected) {
+          trainStatus.innerHTML = `<span class="font-medium">数据状态:</span> <span class="text-gray-600">等待连接数据库...</span>`;
           return;
         }
 
+        trainStatus.innerHTML = `<span class="font-medium">数据状态:</span>
+          <span class="text-green-600">已从数据库加载 ${gameHistory.length} 条（最多显示100条）</span>`;
+      }
+
+      // ====== Supabase：读写 ======
+      async function loadHistoryFromDB() {
+        // 取最新100条（按时间/ID排序都行，这里按ID升序显示）
+        const { data, error } = await supabaseClient
+          .from(TABLE_NAME)
+          .select(`${COL_RESULT}, id, created_at`)
+          .order('id', { ascending: true })
+          .limit(100);
+
+        if (error) throw error;
+
+        gameHistory = (data || []).map(row => row[COL_RESULT]).filter(x => x === 'B' || x === 'P');
+        updateGrid();
+      }
+
+      async function insertToDB(v) {
+        const { error } = await supabaseClient
+          .from(TABLE_NAME)
+          .insert({ [COL_RESULT]: v });
+        if (error) throw error;
+      }
+
+      async function deleteLastFromDB() {
+        // 先查最后一条
+        const { data, error } = await supabaseClient
+          .from(TABLE_NAME)
+          .select('id')
+          .order('id', { ascending: false })
+          .limit(1);
+
+        if (error) throw error;
+        if (!data || data.length === 0) return;
+
+        const lastId = data[0].id;
+        const { error: delErr } = await supabaseClient
+          .from(TABLE_NAME)
+          .delete()
+          .eq('id', lastId);
+
+        if (delErr) throw delErr;
+      }
+
+      async function resetAllInDB() {
+        // 删除所有行（谨慎！）
+        const { error } = await supabaseClient
+          .from(TABLE_NAME)
+          .delete()
+          .neq('id', 0); // id 永远不等于0，相当于全删
+
+        if (error) throw error;
+      }
+
+      // ====== 连接数据库 ======
+      async function connectToDB() {
         btnConnect.disabled = true;
         btnConnect.innerHTML = '<span class="animate-pulse">连接中...</span>';
 
         try {
-          // 模拟 API 验证
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          const inputKey = apiKeyInput.value.trim();
+          const keyToUse = inputKey ? inputKey : SUPABASE_KEY_DEFAULT;
+
+          supabaseClient = window.supabase.createClient(SUPABASE_URL_DEFAULT, keyToUse);
+
+          // 测试一下能不能读
+          await loadHistoryFromDB();
 
           isConnected = true;
           connectionStatus.textContent = '已连接';
@@ -222,103 +295,146 @@
           btnConnect.className = 'absolute right-2 top-1/2 transform -translate-y-1/2 bg-green-600 text-white px-4 py-1 rounded-lg hand-drawn-btn focus:outline-none';
 
           btnPredict.disabled = false;
-        } catch (error) {
-          alert('连接失败: ' + error.message);
-          resetConnectionUI();
+
+          resultText.textContent = "数据库连接成功";
+          resultText.className = "text-2xl font-bold mb-2 text-green-600";
+          confidenceText.textContent = "已加载历史记录";
+          confidenceText.className = "text-sm text-gray-600";
+
+        } catch (e) {
+          console.error(e);
+          isConnected = false;
+          supabaseClient = null;
+
+          connectionStatus.textContent = '未连接';
+          connectionStatus.className = 'px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-800';
+
+          btnConnect.disabled = false;
+          btnConnect.textContent = '连接';
+          btnConnect.className = 'absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-4 py-1 rounded-lg hand-drawn-btn hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2';
+
+          btnPredict.disabled = true;
+
+          alert('连接失败（常见原因：表名/字段名不对、RLS权限限制、Key不对）\n\n错误信息：' + (e.message || e));
         }
       }
 
-      function resetConnectionUI() {
-        isConnected = false;
-        connectionStatus.textContent = '未连接';
-        connectionStatus.className = 'px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-800';
-
-        btnConnect.disabled = false;
-        btnConnect.textContent = '连接';
-        btnConnect.className = 'absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-4 py-1 rounded-lg hand-drawn-btn hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2';
-
-        btnPredict.disabled = true;
-      }
-
+      // ====== “预测”：只做统计提示（带延迟）======
       async function predictNext() {
         if (!isConnected) {
-          alert('请先连接API');
+          alert('请先连接数据库');
           return;
         }
+
         if (gameHistory.length < 5) {
-          alert('至少需要5条历史数据才能进行预测');
+          alert('至少需要 5 条历史数据才能统计提示');
           return;
         }
 
         btnPredict.disabled = true;
-        btnPredict.innerHTML = '<span class="animate-pulse">预测中...</span>';
+        btnPredict.innerHTML = '<span class="animate-pulse">分析中...</span>';
         resultText.textContent = "分析中...";
         resultText.className = "text-2xl font-bold mb-2 text-indigo-500";
-        confidenceText.textContent = "计算准确率...";
+        confidenceText.textContent = "统计计算中...";
 
-        try {
-          // 模拟 API 预测耗时（你要的“分析中”停一下就在这里）
-          await new Promise(resolve => setTimeout(resolve, 1500));
+        // 模拟“分析耗时”（你说原版是先分析中再出结果）
+        await new Promise(r => setTimeout(r, 1500));
 
-          const predictions = ['B', 'P'];
-          const randomPrediction = predictions[Math.floor(Math.random() * predictions.length)];
-          const randomConfidence = (Math.random() * 30 + 70).toFixed(1);
+        // 统计最近 N 条
+        const N = Math.min(30, gameHistory.length);
+        const recent = gameHistory.slice(-N);
+        const bCount = recent.filter(x => x === 'B').length;
+        const pCount = recent.filter(x => x === 'P').length;
 
-          resultText.textContent = randomPrediction === 'B' ? "庄 (B)" : "闲 (P)";
-          resultText.className = `text-2xl font-bold mb-2 ${
-            randomPrediction === 'B' ? 'text-indigo-600' : 'text-pink-600'
-          }`;
+        const bRate = (bCount / N * 100).toFixed(1);
+        const pRate = (pCount / N * 100).toFixed(1);
 
-          confidenceText.textContent = `准确率: ${randomConfidence}%`;
-          confidenceText.className = `text-sm ${
-            parseFloat(randomConfidence) > 85 ? 'text-green-600' : 'text-yellow-600'
-          }`;
-        } catch (error) {
-          alert('预测失败: ' + error.message);
-          resultText.textContent = "预测失败";
-          resultText.className = "text-2xl font-bold mb-2 text-red-500";
-          confidenceText.textContent = "请检查连接后重试";
-          confidenceText.className = "text-sm text-red-500";
-        } finally {
-          btnPredict.disabled = false;
-          btnPredict.textContent = '预测';
+        // 连续趋势
+        let streak = 1;
+        for (let i = recent.length - 1; i > 0; i--) {
+          if (recent[i] === recent[i - 1]) streak++;
+          else break;
         }
+        const last = recent[recent.length - 1];
+
+        // 只是“提示”，不保证
+        const hint = (bCount >= pCount) ? '最近庄偏多' : '最近闲偏多';
+        const streakText = `最近连续：${last} × ${streak}`;
+
+        resultText.textContent = `统计提示：${hint}`;
+        resultText.className = "text-2xl font-bold mb-2 text-indigo-700";
+
+        confidenceText.textContent = `近${N}局：B ${bRate}% / P ${pRate}% ｜ ${streakText}`;
+        confidenceText.className = "text-sm text-gray-700";
+
+        btnPredict.disabled = false;
+        btnPredict.textContent = '预测';
       }
 
-      btnConnect.addEventListener('click', connectToAPI);
+      // ====== 事件 ======
+      btnConnect.addEventListener('click', connectToDB);
 
-      btnB.addEventListener('click', function() {
-        if (gameHistory.length >= 100) return;
-        gameHistory.push('B');
-        updateGrid();
-      });
-
-      btnP.addEventListener('click', function() {
-        if (gameHistory.length >= 100) return;
-        gameHistory.push('P');
-        updateGrid();
-      });
-
-      btnUndo.addEventListener('click', function() {
-        if (gameHistory.length > 0) {
-          gameHistory.pop();
+      btnB.addEventListener('click', async function () {
+        if (!isConnected) return alert('请先连接数据库');
+        try {
+          await insertToDB('B');
+          gameHistory.push('B');
           updateGrid();
+        } catch (e) {
+          alert('写入失败：' + (e.message || e));
         }
       });
 
-      btnReset.addEventListener('click', function() {
-        gameHistory = [];
-        updateGrid();
-        resultText.textContent = "等待预测...";
-        resultText.className = "text-2xl font-bold mb-2 text-gray-500";
-        confidenceText.textContent = "准确率: --%";
-        confidenceText.className = "text-sm text-gray-600";
+      btnP.addEventListener('click', async function () {
+        if (!isConnected) return alert('请先连接数据库');
+        try {
+          await insertToDB('P');
+          gameHistory.push('P');
+          updateGrid();
+        } catch (e) {
+          alert('写入失败：' + (e.message || e));
+        }
+      });
+
+      btnUndo.addEventListener('click', async function () {
+        if (!isConnected) return alert('请先连接数据库');
+        if (gameHistory.length === 0) return;
+
+        try {
+          await deleteLastFromDB();
+          gameHistory.pop();
+          updateGrid();
+        } catch (e) {
+          alert('撤销失败：' + (e.message || e));
+        }
+      });
+
+      btnReset.addEventListener('click', async function () {
+        if (!isConnected) return alert('请先连接数据库');
+
+        const ok = confirm('⚠️重置会清空数据库里所有历史记录，确定继续吗？');
+        if (!ok) return;
+
+        try {
+          await resetAllInDB();
+          gameHistory = [];
+          updateGrid();
+
+          resultText.textContent = "已重置";
+          resultText.className = "text-2xl font-bold mb-2 text-gray-600";
+          confidenceText.textContent = "数据库记录已清空";
+          confidenceText.className = "text-sm text-gray-600";
+        } catch (e) {
+          alert('重置失败：' + (e.message || e));
+        }
       });
 
       btnPredict.addEventListener('click', predictNext);
 
+      // 初始化
       initializeGrid();
-      btnPredict.disabled = true;
+      updateGrid();
+      btnPredict.disabled = true; // 未连接前不可用
     });
   </script>
 </body>
