@@ -1,144 +1,423 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>百家乐预测系统</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <style>
-        /* 样式部分 */
-        :root {
-            --primary: #4f46e5;
-            --secondary: #ec4899;
-            --dark: #1e293b;
-            --light: #f8fafc;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>百家乐预测系统</title>
+  <style>
+    :root{
+      --b:#4b63ff;
+      --p:#ff4fa3;
+      --bg:#f5f7ff;
+      --card:#ffffff;
+      --txt:#1e2330;
+      --muted:#667085;
+      --border:#e6e9f5;
+      --shadow: 0 12px 30px rgba(25,35,70,.10);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",Arial,sans-serif;
+      background:var(--bg);
+      color:var(--txt);
+    }
+    .wrap{max-width:980px;margin:28px auto;padding:0 16px 40px;}
+    h1{text-align:center;margin:14px 0 16px;font-size:34px;letter-spacing:1px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);padding:16px;}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+    .status{display:flex;align-items:center;gap:10px;margin-left:auto;font-weight:600;}
+    .dot{width:10px;height:10px;border-radius:50%;background:#ff4d4f;box-shadow:0 0 0 4px rgba(255,77,79,.12);}
+    .dot.ok{background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.14);}
+    .btn{border:0;cursor:pointer;padding:10px 14px;border-radius:12px;font-weight:700;transition:.15s;user-select:none;}
+    .btn:active{transform:scale(.98)}
+    .btn.primary{background:#1f5eff;color:#fff;}
+    .btn.gray{background:#eef1ff;color:#263257;}
+    .btn.dark{background:#2a2f3a;color:#fff;}
+    .btn.b{background:var(--b);color:#fff;}
+    .btn.p{background:var(--p);color:#fff;}
+    .btn.green{background:#16a34a;color:#fff;}
+    .btn:disabled{opacity:.5;cursor:not-allowed;}
 
-        body {
-            font-family: 'Noto Sans SC', sans-serif;
-            background-color: var(--light);
-        }
+    .hint{color:var(--muted);font-size:14px;margin-top:10px;line-height:1.5;}
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+    /* 60格：10列 × 6行（显示是横排10列，竖向填充） */
+    .gridBox{
+      margin-top:14px;border:1px solid var(--border);border-radius:18px;padding:14px;
+      background:linear-gradient(180deg,#ffffff,#fbfcff);
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(10,1fr);
+      grid-template-rows:repeat(6,48px);
+      gap:10px;
+    }
+    .cell{
+      border-radius:10px;border:1px solid #e7e9fb;background:#f2f4ff;
+      display:flex;align-items:center;justify-content:center;
+      font-weight:900;font-size:18px;letter-spacing:1px;color:#3a4567;
+      user-select:none;
+    }
+    .cell.b{background:rgba(75,99,255,.14);border-color:rgba(75,99,255,.35);color:var(--b);}
+    .cell.p{background:rgba(255,79,163,.14);border-color:rgba(255,79,163,.35);color:var(--p);}
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .grid-item {
-            padding: 20px;
-            text-align: center;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 18px;
-        }
-
-        .btn {
-            background-color: var(--primary);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        .btn:hover {
-            background-color: var(--secondary);
-        }
-    </style>
+    .panel{margin-top:14px;display:grid;grid-template-columns:1fr;gap:12px;}
+    .result{border:1px solid var(--border);border-radius:18px;padding:16px;background:#fff;}
+    .resultTitle{font-weight:900;font-size:18px;margin-bottom:10px;}
+    .big{font-size:34px;font-weight:1000;margin:2px 0 8px;}
+    .sub{color:var(--muted);font-size:14px;}
+    .mini{color:var(--muted);font-size:13px;margin-top:8px;}
+    .footerNote{text-align:center;color:var(--muted);margin-top:14px;font-size:12px;}
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <h1>百家乐预测系统</h1>
 
-<div class="container">
-    <h1 class="text-center text-4xl mb-8">百家乐预测系统</h1>
+    <div class="card">
+      <div class="row">
+        <button id="btnConnect" class="btn primary">重新连接数据库</button>
+        <button id="btnClearLocal" class="btn gray" title="只清空网页上的60格，不影响数据库历史">清空本局(仅界面)</button>
+        <div class="status">
+          <span id="dot" class="dot"></span>
+          <span id="statusText">未连接</span>
+        </div>
+      </div>
 
-    <!-- 用户输入历史数据 -->
-    <div class="grid" id="dataTable"></div>
+      <div class="hint">
+        ✅ 网页只显示你本局输入的 60 手（10列×每列6格，<b>竖着输入</b>）。<br/>
+        ✅ 数据库历史可以存很多（比如1万/10万），但<b>不会显示到网页格子里</b>，只用于统计预测。<br/>
+      </div>
 
-    <!-- 控制按钮 -->
-    <div class="flex justify-center space-x-4">
-        <button class="btn" onclick="predict()">预测</button>
-        <button class="btn" onclick="reset()">重置</button>
+      <div class="gridBox">
+        <div class="row" style="margin-bottom:10px;">
+          <button id="btnB" class="btn b">庄(B)</button>
+          <button id="btnP" class="btn p">闲(P)</button>
+          <button id="btnUndo" class="btn dark">撤销</button>
+          <button id="btnReset" class="btn gray">重置</button>
+          <button id="btnPredict" class="btn green">预测</button>
+
+          <div class="status" style="margin-left:auto;font-weight:700;">
+            <span id="trainText">模型训练状态：未加载历史数据</span>
+          </div>
+        </div>
+
+        <div id="grid" class="grid"></div>
+        <div class="mini" id="localCount">本局已输入：0 / 60</div>
+      </div>
+
+      <div class="panel">
+        <div class="result">
+          <div class="resultTitle">预测结果</div>
+          <div id="predictBig" class="big">等待输入…</div>
+          <div id="predictSub" class="sub">参考度：--%</div>
+          <div class="footerNote">以上内容仅供参考</div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <!-- 显示预测结果 -->
-    <div id="predictionResult" class="mt-8 text-center text-2xl"></div>
+  <!-- Supabase JS (全局 supabase) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // 模拟数据库中的所有历史数据（实际数据来自数据库）
-            const allHistoryData = [
-                { id: 1, result: 'B' },
-                { id: 2, result: 'P' },
-                { id: 3, result: 'B' },
-                { id: 4, result: 'P' },
-                { id: 5, result: 'B' },
-                { id: 6, result: 'P' },
-                { id: 7, result: 'B' },
-                { id: 8, result: 'P' },
-                { id: 9, result: 'B' },
-                { id: 10, result: 'P' },
-                { id: 11, result: 'B' },
-                { id: 12, result: 'P' },
-                // 更多历史数据...
-            ];
+  <script>
+    /************************************************************
+     * 0) 你给我的 Supabase 参数（我已经填好，不用你再填）
+     ************************************************************/
+    const SUPABASE_URL = "https://nljvpnmcnzeibosrtnlp.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_zvkqWardciRVVm4PpzU6Lg_FTZbeqJ3";
+    const TABLE_NAME = "baccarat_history"; // 你建的表名（如果你表名不同，把这里改成你的表名）
 
-            // 显示的历史数据条数（用户输入的前几条数据）
-            const numToShow = 10;
+    /************************************************************
+     * 1) 参数（可调）
+     ************************************************************/
+    const MAX_VISIBLE = 60;        // 网页最多显示60手
+    const MAX_HISTORY_FOR_MODEL = 10000; // 用于“统计预测”的历史上限（不显示在网格）
+    const PAGE_SIZE = 1000;        // Supabase range 每页取多少
+    const PATTERN_LEN = 5;         // 用最近5手做模式匹配（可改3~7）
 
-            // 只显示前 numToShow 条数据
-            const visibleData = allHistoryData.slice(0, numToShow);
+    /************************************************************
+     * 2) 状态：本局显示 / 历史仅用于预测
+     ************************************************************/
+    let localSeq = [];     // 仅本局显示（最多60）
+    let historySeq = [];   // 历史（不显示）
 
-            // 更新网页上显示的数据
-            displayDataOnPage(visibleData);
+    let sb = null;
+    let connected = false;
 
-            // 显示数据到页面
-            function displayDataOnPage(data) {
-                const table = document.getElementById('dataTable'); // 假设你有一个ID为dataTable的表格
-                table.innerHTML = ''; // 清空表格
-                data.forEach(row => {
-                    let newRow = table.insertRow();
-                    let cell1 = newRow.insertCell(0);
-                    cell1.innerHTML = row.id;
-                    let cell2 = newRow.insertCell(1);
-                    cell2.innerHTML = row.result;
-                });
-            }
+    // UI
+    const elGrid = document.getElementById("grid");
+    const elDot = document.getElementById("dot");
+    const elStatus = document.getElementById("statusText");
+    const elTrain = document.getElementById("trainText");
+    const elLocalCount = document.getElementById("localCount");
 
-            // 假设你调用后端API进行预测
-            function predict() {
-                // 使用数据库中的所有历史数据进行预测（后端不受前端显示数据限制）
-                const predictionResult = predictWithAllData(allHistoryData);
-                displayPredictionResult(predictionResult);
-            }
+    const btnConnect = document.getElementById("btnConnect");
+    const btnB = document.getElementById("btnB");
+    const btnP = document.getElementById("btnP");
+    const btnUndo = document.getElementById("btnUndo");
+    const btnReset = document.getElementById("btnReset");
+    const btnPredict = document.getElementById("btnPredict");
+    const btnClearLocal = document.getElementById("btnClearLocal");
 
-            // 使用所有历史数据进行预测
-            function predictWithAllData(data) {
-                // 假设你在这里调用数据库API进行预测
-                // 此处模拟预测结果
-                return 'P'; // 示例：预测结果为P
-            }
+    const elPredictBig = document.getElementById("predictBig");
+    const elPredictSub = document.getElementById("predictSub");
 
-            // 显示预测结果
-            function displayPredictionResult(result) {
-                const predictionElement = document.getElementById('predictionResult');
-                predictionElement.innerText = `预测结果: ${result}`;
-            }
+    function setConnected(ok){
+      connected = ok;
+      elDot.className = ok ? "dot ok" : "dot";
+      elStatus.textContent = ok ? "已连接" : "未连接";
+      btnB.disabled = !ok;
+      btnP.disabled = !ok;
+      btnPredict.disabled = !ok;
+    }
 
-            // 重置页面
-            function reset() {
-                displayDataOnPage([]); // 清空显示的数据
-                document.getElementById('predictionResult').innerText = ''; // 清空预测结果
-            }
-        });
-    </script>
-</div>
+    // 创建 6行×10列 的格子（显示是10列）
+    function initGrid(){
+      elGrid.innerHTML = "";
+      // grid 默认按行排：第1行10个，第2行10个...
+      // 我们要竖着输入：第1列从上到下6个，然后第2列...
+      // 所以渲染时做位置映射（见 renderLocal）
+      for(let i=0;i<MAX_VISIBLE;i++){
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.textContent = "";
+        elGrid.appendChild(cell);
+      }
+    }
 
+    // 竖向输入映射：第i手 -> (列col, 行row) -> 网格位置pos
+    function idxToPos(i){
+      const col = Math.floor(i / 6); // 0..9
+      const row = i % 6;             // 0..5
+      return row * 10 + col;         // row-major 位置
+    }
+
+    function clearGridCells(){
+      const cells = elGrid.querySelectorAll(".cell");
+      cells.forEach(c => { c.className="cell"; c.textContent=""; });
+    }
+
+    function renderLocal(){
+      clearGridCells();
+      const cells = elGrid.querySelectorAll(".cell");
+
+      for(let i=0;i<localSeq.length;i++){
+        const v = localSeq[i];
+        const pos = idxToPos(i);
+        const cell = cells[pos];
+        if(!cell) continue;
+        if(v === "B"){
+          cell.classList.add("b");
+          cell.textContent = "B";
+        }else if(v === "P"){
+          cell.classList.add("p");
+          cell.textContent = "P";
+        }
+      }
+      elLocalCount.textContent = `本局已输入：${localSeq.length} / ${MAX_VISIBLE}`;
+    }
+
+    function resetLocal(keepPredict=false){
+      localSeq = [];
+      renderLocal();
+      if(!keepPredict){
+        elPredictBig.textContent = "等待输入…";
+        elPredictSub.textContent = "参考度：--%";
+      }
+    }
+
+    async function connectSupabase(){
+      try{
+        setConnected(false);
+        elTrain.textContent = "模型训练状态：正在连接并加载历史数据…";
+
+        sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 拉历史（只用于预测，不显示）
+        historySeq = await fetchHistoryResults(MAX_HISTORY_FOR_MODEL);
+
+        setConnected(true);
+        elTrain.textContent = `模型训练状态：已加载 ${historySeq.length} 条历史数据（仅用于模型，不显示）`;
+      }catch(e){
+        console.error(e);
+        setConnected(false);
+        elTrain.textContent = "模型训练状态：连接失败";
+        alert("连接失败：请检查 Supabase 的表名/权限（RLS）或网络。");
+      }
+    }
+
+    async function fetchHistoryResults(maxCount){
+      const results = [];
+      let from = 0;
+
+      while(results.length < maxCount){
+        const to = Math.min(from + PAGE_SIZE - 1, from + (maxCount - results.length) - 1);
+
+        const { data, error } = await sb
+          .from(TABLE_NAME)
+          .select("result,id")
+          .order("id", { ascending: false })
+          .range(from, to);
+
+        if(error) throw error;
+        if(!data || data.length === 0) break;
+
+        for(const row of data){
+          if(row && (row.result === "B" || row.result === "P")) results.push(row.result);
+        }
+
+        if(data.length < (to - from + 1)) break;
+        from += PAGE_SIZE;
+      }
+
+      // 变成时间正序（旧→新）
+      results.reverse();
+      return results;
+    }
+
+    async function insertOne(result){
+      const { error } = await sb.from(TABLE_NAME).insert([{ result }]);
+      if(error) throw error;
+    }
+
+    function buildStats(seq, k){
+      const map = new Map();
+      for(let i=0;i + k < seq.length;i++){
+        const pat = seq.slice(i, i+k).join("");
+        const next = seq[i+k];
+        if(next !== "B" && next !== "P") continue;
+        if(!map.has(pat)) map.set(pat, {B:0, P:0});
+        map.get(pat)[next] += 1;
+      }
+      return map;
+    }
+
+    function predictNext(){
+      const full = historySeq.concat(localSeq);
+
+      if(full.length < 10){
+        return { pick: "B", prob: 0.5, note: "历史太少，先多收集一些" };
+      }
+
+      // 总体概率兜底
+      let cntB = 0, cntP = 0;
+      for(const x of full){
+        if(x==="B") cntB++;
+        if(x==="P") cntP++;
+      }
+      const basePB = cntB / (cntB + cntP || 1);
+
+      // 模式匹配
+      const k = PATTERN_LEN;
+      const stats = buildStats(full, k);
+      const tail = full.slice(-k).join("");
+
+      if(stats.has(tail)){
+        const obj = stats.get(tail);
+        const sum = obj.B + obj.P;
+        if(sum > 0){
+          const pB = obj.B / sum;
+          const pick = pB >= 0.5 ? "B" : "P";
+          const prob = pick === "B" ? pB : (1 - pB);
+          return { pick, prob, note: `基于最近${k}手模式统计` };
+        }
+      }
+
+      // 没匹配就用总体
+      const pick = basePB >= 0.5 ? "B" : "P";
+      const prob = pick === "B" ? basePB : (1 - basePB);
+      return { pick, prob, note: "未匹配到模式，使用总体概率" };
+    }
+
+    function showPredict(res){
+      elPredictBig.textContent = (res.pick === "B") ? "庄 (B)" : "闲 (P)";
+      const pct = Math.round(res.prob * 100);
+      elPredictSub.textContent = `参考度：${pct}%（${res.note}）`;
+    }
+
+    async function onInput(result){
+      if(!connected){
+        alert("正在连接数据库…请稍等，或点【重新连接数据库】");
+        return;
+      }
+      if(localSeq.length >= MAX_VISIBLE){
+        alert("本局最多输入 60 手。点【重置】开始新一局（数据库历史不会丢）。");
+        return;
+      }
+
+      // 更新界面
+      localSeq.push(result);
+      renderLocal();
+
+      // 写入数据库（历史越用越多）
+      try{
+        await insertOne(result);
+        historySeq.push(result);
+        elTrain.textContent = `模型训练状态：已加载 ${historySeq.length} 条历史数据（仅用于模型，不显示）`;
+      }catch(e){
+        console.error(e);
+        alert("写入数据库失败：可能是表名不对、RLS没关、或网络问题。");
+      }
+    }
+
+    // 事件
+    btnConnect.addEventListener("click", connectSupabase);
+    btnB.addEventListener("click", ()=>onInput("B"));
+    btnP.addEventListener("click", ()=>onInput("P"));
+
+    btnUndo.addEventListener("click", ()=>{
+      if(localSeq.length === 0) return;
+      localSeq.pop();
+      renderLocal();
+    });
+
+    btnReset.addEventListener("click", ()=>{
+      resetLocal(false);
+    });
+
+    btnClearLocal.addEventListener("click", ()=>{
+      resetLocal(true);
+      alert("已清空本局界面（数据库历史不受影响）");
+    });
+
+    // 预测：先显示“分析中…”，延迟一下再出结果
+    btnPredict.addEventListener("click", ()=>{
+      if(!connected){
+        alert("正在连接数据库…请稍等，或点【重新连接数据库】");
+        return;
+      }
+      if(localSeq.length < 2){
+        alert("至少输入几手再预测。");
+        return;
+      }
+
+      btnPredict.disabled = true;
+      const oldText = btnPredict.textContent;
+      btnPredict.textContent = "分析中…";
+      elPredictBig.textContent = "分析中…";
+      elPredictSub.textContent = "正在计算…";
+
+      setTimeout(()=>{
+        const res = predictNext();
+        showPredict(res);
+        btnPredict.disabled = false;
+        btnPredict.textContent = oldText;
+      }, 1200);
+    });
+
+    /************************************************************
+     * 3) 初始化（你问的“最后那段初始化”就是这里）
+     ************************************************************/
+    initGrid();
+    renderLocal();
+    setConnected(false);
+    btnB.disabled = true;
+    btnP.disabled = true;
+    btnPredict.disabled = true;
+
+    // 自动连接：打开网页就连上
+    connectSupabase();
+  </script>
 </body>
 </html>
