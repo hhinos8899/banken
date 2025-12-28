@@ -231,8 +231,7 @@
       try{
         setConnected(false);
         elTrain.textContent = "模型训练状态：正在连接并加载历史数据…";
-
-        sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      sb = window.supabase;
 
         // 拉历史（只用于预测，不显示）
         historySeq = await fetchHistoryResults(MAX_HISTORY_FOR_MODEL);
