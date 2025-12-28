@@ -421,7 +421,8 @@
   </script>
 <script type="module">
   import { supabase } from "./supabaseClient.js";
-
+window.supabase = supabase;
+ 
   // 测试：读表 baccarat_history 的 5 条
   const { data, error } = await supabase
     .from("baccarat_history")
