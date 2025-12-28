@@ -419,5 +419,16 @@
     // 自动连接：打开网页就连上
     connectSupabase();
   </script>
-</body>
+<script type="module">
+  import { supabase } from "./supabaseClient.js";
+
+  // 测试：读表 baccarat_history 的 5 条
+  const { data, error } = await supabase
+    .from("baccarat_history")
+    .select("*")
+    .limit(5);
+
+  console.log("data:", data);
+  console.log("error:", error);
+</script></body>
 </html>
