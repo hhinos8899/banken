@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>方案 C · 下一把到来才解锁播报</title>
+<title>方案 C · 下一把到来才解锁播报版</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 body{margin:0;background:#0b0c0f;color:#e9eef8;font-family:system-ui}
@@ -56,13 +56,14 @@ const THRESHOLD = 4;
 
 /* ===== 状态 ===== */
 let history = [];
-let used = false;       // 本结构期已用过一次“可以动”
-let inStruct = false;   // 当前处于结构期（曾出现过dir）
+let used = false;
+let inStruct = false;
 
-/* ===== “下一把到来才解锁”用到的状态 ===== */
-let prevRecentKey = "";
+/* ===== “下一把到来才解锁”关键状态 ===== */
+let lastBannerText = "";
+let pendingUnlockOnNextBP = false;
 
-/* ===== 女声 TTS（Edge）===== */
+/* ===== 女声 TTS ===== */
 let voice = null;
 function pickVoice(){
   const v = speechSynthesis.getVoices();
@@ -97,18 +98,33 @@ function countBP(arr){
 function add(x){
   speechSynthesis.resume();
   history.push(x);
+
+  // ✅ 只在“下一把真的来了”（录入B/P）时，才播解锁
+  if ((x==="B" || x==="P") && pendingUnlockOnNextBP) {
+    speak("结构已解锁");
+    pendingUnlockOnNextBP = false;
+    used = false;
+    inStruct = false;
+  }
+
   render();
 }
+
 function undo(){
   history.pop();
-  // 撤销后重新渲染即可；别强行重置used，让逻辑自然跟随当前窗口
+  used=false;
+  inStruct=false;
+  pendingUnlockOnNextBP=false;
+  lastBannerText="";
   render();
 }
+
 function resetAll(){
   history=[];
   used=false;
   inStruct=false;
-  prevRecentKey="";
+  pendingUnlockOnNextBP=false;
+  lastBannerText="";
   render();
 }
 
@@ -123,22 +139,11 @@ function render(){
   document.getElementById("recent").textContent =
     recent.length<6 ? "不足" : recent.join("");
 
-  // 生成“最近6把”的key（只在满6把时有效）
-  const recentKey = (recent.length === 6) ? recent.join("") : "";
-
-  // ✅ 解锁播报：必须“上一轮用过一次(used=true)”，且“下一把真的来了(最近6把变化)”
-  if (used && prevRecentKey && recentKey && recentKey !== prevRecentKey) {
-    speak("结构已解锁");
-    used = false;
-    inStruct = false;
-  }
-  if (recentKey) prevRecentKey = recentKey;  // 只有满6把才更新key
-  if (!recentKey) prevRecentKey = "";        // 不足6把时清空，避免乱触发
-
   if(recent.length<6){
     banner.className="big no";
     banner.textContent="现在：不要动";
     reason.textContent="数据不足";
+    lastBannerText = banner.textContent;
     return;
   }
 
@@ -165,6 +170,12 @@ function render(){
     banner.textContent="现在：不要动";
     reason.textContent="未达 4/6 阈值";
   }
+
+  // ✅ 结构结束时：不立刻播解锁，只是“挂起”，等下一把B/P来了再播
+  if (lastBannerText.startsWith("可以动") && banner.textContent==="现在：不要动") {
+    pendingUnlockOnNextBP = true;
+  }
+  lastBannerText = banner.textContent;
 }
 </script>
 </body>
