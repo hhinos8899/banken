@@ -2,143 +2,155 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>方案 C · 静态版（不联网）</title>
+<title>方案 C · 静态版（女声）</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-  body{background:#0e0e0e;color:#ddd;font-family:system-ui;
-    max-width:900px;margin:20px auto;padding:10px}
-  h1{color:#6cff9f}
-  button{margin:4px;padding:8px 14px;border-radius:8px;
-    border:1px solid #444;background:#1e1e1e;color:#ddd;cursor:pointer}
-  button:hover{background:#2a2a2a}
-  .ok{color:#6cff9f}
-  .no{color:#ff6c6c}
-  .box{border:1px solid #333;border-radius:12px;padding:12px;margin:12px 0}
-  pre{white-space:pre-wrap}
+body{margin:0;background:#0b0c0f;color:#e9eef8;font-family:system-ui}
+.wrap{max-width:960px;margin:24px auto;padding:0 14px}
+.btn{padding:10px 14px;border-radius:12px;border:1px solid #333;background:#111;color:#eee;font-weight:700;cursor:pointer}
+.btn:hover{background:#1a1a1a}
+.btn.red{border-color:#553;color:#fbb}
+.panel{border:1px solid #222;background:#111;border-radius:16px;padding:16px;margin-top:12px}
+.big{font-size:36px;font-weight:900;text-align:center;padding:18px;border-radius:14px}
+.big.ok{background:#123;color:#2ee08a}
+.big.no{background:#200;color:#ff6b6b}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.mono{font-family:ui-monospace,Consolas,monospace}
+.small{font-size:13px;color:#aaa}
+.box{border:1px solid #222;border-radius:12px;padding:12px;margin-top:10px}
 </style>
 </head>
+
 <body>
+<div class="wrap">
+<h2>方案 C · 静态版（完全本地 + 女声）</h2>
 
-<h1>方案 C · 静态版（完全本地）</h1>
-
-<div class="box">
-  <button onclick="add('B')">录入 B</button>
-  <button onclick="add('P')">录入 P</button>
-  <button onclick="add('T')">录入 T（和）</button>
-  <button onclick="undo()">撤销</button>
-  <button onclick="reset()" style="color:#ff6c6c">清空</button>
+<div class="row">
+  <button class="btn" onclick="add('B')">录入 B</button>
+  <button class="btn" onclick="add('P')">录入 P</button>
+  <button class="btn" onclick="add('T')">录入 T（和）</button>
+  <button class="btn" onclick="undo()">撤销</button>
+  <button class="btn red" onclick="resetAll()">清空</button>
 </div>
 
-<div class="box" id="result"></div>
+<div class="panel">
+  <div id="banner" class="big no">现在：不要动</div>
+  <div class="small" id="reason" style="margin-top:10px"></div>
+</div>
+
 <div class="box">
-  <b>完整历史：</b>
-  <pre id="history"></pre>
+  <div class="small">最近 6 把（只算 B / P）：</div>
+  <div class="mono" id="recent">不足</div>
+</div>
+
+<div class="box">
+  <div class="small">完整历史：</div>
+  <div class="mono" id="history">（空）</div>
+</div>
 </div>
 
 <script>
-/* ====== 参数 ====== */
+/* ===== 参数 ===== */
 const SUB_WINDOW = 6;
 const THRESHOLD = 4;
-const KEEP = 200;
-const COOLDOWN = 0;
 
-/* ====== 状态 ====== */
+/* ===== 状态 ===== */
 let history = [];
 let used = false;
-let inStructure = false;
-let cooldown = 0;
+let inStruct = false;
 
-/* ====== 工具 ====== */
-function lastN(arr,n){return arr.length>=n?arr.slice(-n):arr}
-function countBP(seq){
-  return {B:seq.filter(x=>x==="B").length,
-          P:seq.filter(x=>x==="P").length}
+/* ===== 女声（Windows 中文）===== */
+let voice = null;
+function pickVoice(){
+  const v = speechSynthesis.getVoices();
+  voice =
+    v.find(x=>x.name.includes("Huihui") && x.lang==="zh-CN") ||
+    v.find(x=>x.name.includes("Xiaoxiao") && x.lang==="zh-CN") ||
+    v.find(x=>x.lang==="zh-CN") || null;
+}
+speechSynthesis.onvoiceschanged = pickVoice;
+
+function speak(text){
+  if(!voice) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.voice = voice;
+  u.rate = 1.0;
+  u.pitch = 1.1;
+  speechSynthesis.speak(u);
 }
 
-function judge(){
-  const recent = lastN(history,SUB_WINDOW);
-  if(recent.length<SUB_WINDOW)
-    return [null,`数据不足：${recent.length}/${SUB_WINDOW}`];
-
-  const {B,P} = countBP(recent);
-  const road = recent.join("");
-  if(B>=THRESHOLD)
-    return ["B",`最近6把=${road}，B=${B} ≥ ${THRESHOLD}`];
-  if(P>=THRESHOLD)
-    return ["P",`最近6把=${road}，P=${P} ≥ ${THRESHOLD}`];
-  if(B===P)
-    return [null,`最近6把=${road}，3:3 持平`];
-  return [null,`最近6把=${road}，偏向不够硬`];
+/* ===== 逻辑 ===== */
+function lastBP(){
+  return history.filter(x=>x==="B"||x==="P").slice(-SUB_WINDOW);
+}
+function countBP(arr){
+  return {b:arr.filter(x=>"B"===x).length,p:arr.filter(x=>"P"===x).length};
 }
 
-function beep(){
-  try{
-    const ctx=new AudioContext();
-    const o=ctx.createOscillator();
-    o.frequency.value=900;
-    o.connect(ctx.destination);
-    o.start();setTimeout(()=>o.stop(),150);
-  }catch(e){}
-}
-
-/* ====== 主逻辑 ====== */
 function add(x){
-  if(!["B","P","T"].includes(x))return;
   history.push(x);
-  history=history.slice(-KEEP);
-  if(cooldown>0) cooldown--;
-
-  const [dir,reason]=judge();
-  const nowStructure = dir!==null;
-
-  if(inStructure && !nowStructure){
-    inStructure=false;
-    used=false;
-  }
-  if(!inStructure && nowStructure){
-    inStructure=true;
-  }
-
-  let out="";
-
-  if(dir && !used && cooldown===0){
-    out+=`<div class="ok">✅ 可以动：下注 ${dir}</div>`;
-    out+=`<div>${reason}</div>`;
-    used=true;
-    if(COOLDOWN>0) cooldown=COOLDOWN;
-    beep();
-  }else{
-    out+=`<div class="no">⛔ 不要动</div>`;
-    out+=`<div>${reason}</div>`;
-    if(used && inStructure)
-      out+=`<div>补充：本结构期机会已用</div>`;
-  }
-
-  render(out);
+  render();
 }
 
 function undo(){
-  if(history.length){
-    history.pop();
-    used=false;
-    inStructure=false;
-    cooldown=0;
-    render("已撤销上一把");
-  }
+  history.pop();
+  used=false;
+  inStruct=false;
+  render();
 }
 
-function reset(){
+function resetAll(){
   history=[];
   used=false;
-  inStructure=false;
-  cooldown=0;
-  render("已清空");
+  inStruct=false;
+  render();
 }
 
-function render(msg){
-  document.getElementById("result").innerHTML=msg;
-  document.getElementById("history").textContent=history.join("");
+function render(){
+  document.getElementById("history").textContent = history.join("")||"（空）";
+
+  const recent = lastBP();
+  document.getElementById("recent").textContent =
+    recent.length<6 ? "不足" : recent.join("");
+
+  let banner = document.getElementById("banner");
+  let reason = document.getElementById("reason");
+
+  if(recent.length<6){
+    banner.className="big no";
+    banner.textContent="现在：不要动";
+    reason.textContent="数据不足";
+    return;
+  }
+
+  const {b,p}=countBP(recent);
+  let dir=null;
+
+  if(b>=THRESHOLD) dir="B";
+  if(p>=THRESHOLD) dir="P";
+
+  if(dir){
+    if(!used){
+      banner.className="big ok";
+      banner.textContent="可以动："+dir;
+      reason.textContent=`最近6把=${recent.join("")}  B=${b} P=${p}`;
+      speak("可以动，下注 " + dir);
+      used=true;
+      inStruct=true;
+    }else{
+      banner.className="big no";
+      banner.textContent="现在：不要动";
+      reason.textContent="本结构期已用过一次";
+    }
+  }else{
+    banner.className="big no";
+    banner.textContent="现在：不要动";
+    reason.textContent="未达 4/6 阈值";
+    used=false;
+    inStruct=false;
+  }
 }
 </script>
-
 </body>
 </html>
