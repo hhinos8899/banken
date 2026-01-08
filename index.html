@@ -51,9 +51,13 @@ let used = false;                 // 已经下注过一次
 let lockFramePassed = false;      // 是否已经跨过“下注那一把”
 let prevRecentKey = "";
 
-// ✅ 新增：防连播、防定时器堆积
+// ✅ 防连播、防定时器堆积
 let lastSpeech = "";
 let pendingSpeakTimer = null;
+
+// ✅ 新增：同一 recentKey 的下注播报只触发一次
+let lastBetKey = "";
+let lastBetDir = "";
 
 /* ===== 女声 ===== */
 let voice=null;
@@ -105,9 +109,13 @@ function resetAll(){
   lockFramePassed=false;
   prevRecentKey="";
 
-  // ✅ 新增：清理播报状态/定时器
+  // ✅ 清理播报状态/定时器
   lastSpeech="";
   if (pendingSpeakTimer) { clearTimeout(pendingSpeakTimer); pendingSpeakTimer=null; }
+
+  // ✅ 清理下注播报去重
+  lastBetKey="";
+  lastBetDir="";
 
   render();
 }
@@ -124,12 +132,19 @@ function render(){
 
   const recentKey=recent.length===6?recent.join(""):"";
 
+  // ✅ 本轮是否刚刚解锁（解锁那一把不立刻再播“下注”）
+  let unlockedThisFrame = false;
+
   // —— 解锁判断（只在下注后的“下一把”）——
-  if(used && lockFramePassed && prevRecentKey && recentKey!==prevRecentKey){
+  if(used && lockFramePassed && prevRecentKey && recentKey && recentKey!==prevRecentKey){
     speak("结构已解锁");
     used=false;
     lockFramePassed=false;
+
+    unlockedThisFrame = true;  // ✅ 标记
+    lastBetKey = recentKey;    // ✅ 防止同一轮马上又触发“下注播报”
   }
+
   if(recentKey) prevRecentKey=recentKey;
 
   if(recent.length<6){
@@ -148,12 +163,18 @@ function render(){
       banner.textContent="可以动："+dir;
       reason.textContent=`最近6把=${recent.join("")}`;
 
-      // ✅ 改：先清掉旧定时器，防堆积连喊
-      if (pendingSpeakTimer) clearTimeout(pendingSpeakTimer);
-      pendingSpeakTimer = setTimeout(()=>{
-        speak("可以动，下注 " + dir);
-        pendingSpeakTimer = null;
-      }, 250);
+      // ✅ 刚解锁的这一把不播下注（避免“连续叫”）
+      // ✅ 同一个 recentKey 只播一次（除非方向变了）
+      if(!unlockedThisFrame && (recentKey !== lastBetKey || dir !== lastBetDir)){
+        if (pendingSpeakTimer) clearTimeout(pendingSpeakTimer);
+        pendingSpeakTimer = setTimeout(()=>{
+          speak("可以动，下注 " + dir);
+          pendingSpeakTimer = null;
+        }, 250);
+
+        lastBetKey = recentKey;
+        lastBetDir = dir;
+      }
 
       used=true;
       lockFramePassed=false;   // ⚠️ 刚下注，还不能解锁
