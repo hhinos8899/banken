@@ -1,121 +1,88 @@
-、<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>方案C - 前端静态页</title>
+  <title>方案十一 · 静态展示版</title>
   <style>
-    body{font-family:system-ui,Segoe UI,Arial;max-width:900px;margin:24px auto;padding:0 12px;line-height:1.4}
-    .row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-    input,button,textarea{padding:10px;border:1px solid #ccc;border-radius:8px;font-size:14px}
-    input{flex:1;min-width:240px}
-    button{cursor:pointer}
-    textarea{width:100%;min-height:180px}
-    .card{border:1px solid #eee;border-radius:12px;padding:12px;margin:12px 0}
-    .hint{color:#666;font-size:13px}
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Arial;
+      max-width: 900px;
+      margin: 24px auto;
+      padding: 0 12px;
+      line-height: 1.5;
+    }
+    h1{margin-bottom:6px}
+    .sub{color:#666;font-size:13px;margin-bottom:16px}
+    .card{
+      border:1px solid #e5e5e5;
+      border-radius:12px;
+      padding:14px;
+      margin:14px 0;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(6,1fr);
+      gap:6px;
+      margin-top:10px;
+    }
+    .cell{
+      border:1px solid #ddd;
+      border-radius:6px;
+      padding:10px 0;
+      text-align:center;
+      font-weight:600;
+      font-size:14px;
+    }
+    .B{background:#e6f0ff}
+    .P{background:#ffecec}
+    .T{background:#f3f3f3}
+    button{
+      margin-top:10px;
+      padding:10px 14px;
+      border-radius:8px;
+      border:1px solid #ccc;
+      background:#f7f7f7;
+      cursor:pointer;
+    }
+    button:hover{background:#eee}
     .ok{color:#0a7}
-    .bad{color:#c00}
-    code{background:#f6f6f6;padding:2px 6px;border-radius:6px}
   </style>
 </head>
 <body>
-  <h2>方案C 前端静态页</h2>
-  <div class="card">
-    <div class="row">
-      <input id="base" placeholder="填你的后端地址，例如：http://47.123.7.54:8081" />
-      <button onclick="saveBase()">保存</button>
-      <button onclick="openAdmin()">打开 /admin</button>
-      <button onclick="openStatic()">打开 /static/simple.html</button>
-    </div>
-    <div class="hint">
-      说明：这个页面是<strong>纯静态</strong>，只能负责“发请求/跳转”。后端必须能公网访问时才会成功。
-      <br/>如果你后端在国内网络/轻量服务器上被拦，打开会 <span class="bad">502/超时</span>，这不是前端问题。
-    </div>
-  </div>
 
-  <div class="card">
-    <h3>测试接口：POST <code>/api/manual</code></h3>
-    <div class="row">
-      <button onclick="callManual()">发送请求</button>
-      <button onclick="fillDemo()">填入示例 JSON</button>
-    </div>
-    <textarea id="payload" placeholder='这里填要发给 /api/manual 的 JSON，比如：{"a":1}'></textarea>
-    <div class="row">
-      <div id="status" class="hint"></div>
-    </div>
-    <textarea id="output" placeholder="这里显示返回结果"></textarea>
-  </div>
+<h1>方案十一 · 静态服务器版</h1>
+<div class="sub">
+  状态：<span class="ok">纯前端 · 不依赖后端 · 静态服务器</span>
+</div>
+
+<div class="card">
+  <b>示例盘路（Mock 数据）</b>
+  <div class="grid" id="road"></div>
+  <button onclick="regen()">重新生成</button>
+</div>
 
 <script>
-  const baseEl = document.getElementById("base");
-  const payloadEl = document.getElementById("payload");
-  const outEl = document.getElementById("output");
-  const statusEl = document.getElementById("status");
+  const road = document.getElementById("road");
+  const TYPES = ["B","P","T"]; // Banker / Player / Tie
 
-  function normBase(s){
-    s = (s||"").trim();
-    if(!s) return "";
-    s = s.replace(/\/+$/,"");
-    return s;
-  }
-
-  function saveBase(){
-    const v = normBase(baseEl.value);
-    localStorage.setItem("SCHEME_C_BASE", v);
-    statusEl.innerHTML = v ? `已保存后端地址：<span class="ok">${v}</span>` : `<span class="bad">后端地址为空</span>`;
-  }
-
-  function loadBase(){
-    const v = localStorage.getItem("SCHEME_C_BASE") || "";
-    baseEl.value = v;
-  }
-
-  function openAdmin(){
-    const b = normBase(baseEl.value);
-    if(!b) return alert("先填后端地址（例如 http://47.123.7.54:8081）");
-    window.open(b + "/admin", "_blank");
-  }
-
-  function openStatic(){
-    const b = normBase(baseEl.value);
-    if(!b) return alert("先填后端地址（例如 http://47.123.7.54:8081）");
-    window.open(b + "/static/simple.html", "_blank");
-  }
-
-  function fillDemo(){
-    payloadEl.value = JSON.stringify({ action:"manual", ts: Date.now() }, null, 2);
-  }
-
-  async function callManual(){
-    const b = normBase(baseEl.value);
-    if(!b) return alert("先填后端地址（例如 http://47.123.7.54:8081）");
-
-    let bodyObj;
-    try{
-      bodyObj = payloadEl.value ? JSON.parse(payloadEl.value) : {};
-    }catch(e){
-      return alert("JSON 格式不对：\n" + e.message);
-    }
-
-    statusEl.textContent = "请求中...";
-    outEl.value = "";
-
-    try{
-      const resp = await fetch(b + "/api/manual", {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify(bodyObj)
-      });
-
-      const text = await resp.text();
-      statusEl.innerHTML = `HTTP 状态：<strong>${resp.status}</strong> ${resp.ok ? '<span class="ok">(OK)</span>' : '<span class="bad">(FAIL)</span>'}`;
-      outEl.value = text;
-    }catch(err){
-      statusEl.innerHTML = `<span class="bad">请求失败（通常是跨域/CORS 或后端公网不可达）：</span>${err}`;
+  function draw(){
+    road.innerHTML = "";
+    for(let i=0;i<36;i++){
+      const t = TYPES[Math.floor(Math.random()*TYPES.length)];
+      const d = document.createElement("div");
+      d.className = "cell " + t;
+      d.textContent = t;
+      road.appendChild(d);
     }
   }
 
-  loadBase();
+  function regen(){
+    draw();
+  }
+
+  draw();
 </script>
+
 </body>
 </html>
