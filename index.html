@@ -20,28 +20,23 @@ body{margin:0;background:#0b0c0f;color:#e9eef8;font-family:system-ui}
 .box{border:1px solid #222;border-radius:12px;padding:12px;margin-top:10px}
 </style>
 </head>
-
 <body>
 <div class="wrap">
 <h2>方案 C · 正确解锁节奏</h2>
-
 <div class="row">
   <button class="btn" onclick="add('B')">录入 B</button>
   <button class="btn" onclick="add('P')">录入 P</button>
   <button class="btn" onclick="undo()">撤销</button>
   <button class="btn red" onclick="resetAll()">清空</button>
 </div>
-
 <div class="panel">
   <div id="banner" class="big no">现在：不要动</div>
   <div class="small" id="reason" style="margin-top:10px"></div>
 </div>
-
 <div class="box">
   <div class="small">最近 6 把（只算 B / P）：</div>
   <div class="mono" id="recent">不足</div>
 </div>
-
 <div class="box">
   <div class="small">完整历史：</div>
   <div class="mono" id="history">（空）</div>
@@ -51,11 +46,14 @@ body{margin:0;background:#0b0c0f;color:#e9eef8;font-family:system-ui}
 <script>
 const SUB_WINDOW = 6;
 const THRESHOLD = 4;
-
 let history = [];
 let used = false;                 // 已经下注过一次
 let lockFramePassed = false;      // 是否已经跨过“下注那一把”
 let prevRecentKey = "";
+
+// ✅ 新增：防连播、防定时器堆积
+let lastSpeech = "";
+let pendingSpeakTimer = null;
 
 /* ===== 女声 ===== */
 let voice=null;
@@ -67,7 +65,17 @@ pickVoice();
 speechSynthesis.onvoiceschanged=pickVoice;
 
 function speak(t){
-  speechSynthesis.cancel();
+  if(!t) return;
+
+  // ✅ 同一句不重复播
+  if(t === lastSpeech) return;
+  lastSpeech = t;
+
+  // ✅ 只有正在说/排队时才 cancel，避免疯狂打断造成“乱叫”
+  if (speechSynthesis.speaking || speechSynthesis.pending) {
+    speechSynthesis.cancel();
+  }
+
   const u=new SpeechSynthesisUtterance(t);
   if(voice) u.voice=voice;
   speechSynthesis.speak(u);
@@ -96,6 +104,11 @@ function resetAll(){
   used=false;
   lockFramePassed=false;
   prevRecentKey="";
+
+  // ✅ 新增：清理播报状态/定时器
+  lastSpeech="";
+  if (pendingSpeakTimer) { clearTimeout(pendingSpeakTimer); pendingSpeakTimer=null; }
+
   render();
 }
 
@@ -103,8 +116,8 @@ function resetAll(){
 function render(){
   const banner=document.getElementById("banner");
   const reason=document.getElementById("reason");
-
   document.getElementById("history").textContent=history.join("")||"（空）";
+
   const recent=lastBP();
   document.getElementById("recent").textContent=
     recent.length<6?"不足":recent.join("");
@@ -117,7 +130,6 @@ function render(){
     used=false;
     lockFramePassed=false;
   }
-
   if(recentKey) prevRecentKey=recentKey;
 
   if(recent.length<6){
@@ -135,7 +147,14 @@ function render(){
     if(!used){
       banner.textContent="可以动："+dir;
       reason.textContent=`最近6把=${recent.join("")}`;
-      setTimeout(()=>speak("可以动，下注 "+dir),250);
+
+      // ✅ 改：先清掉旧定时器，防堆积连喊
+      if (pendingSpeakTimer) clearTimeout(pendingSpeakTimer);
+      pendingSpeakTimer = setTimeout(()=>{
+        speak("可以动，下注 " + dir);
+        pendingSpeakTimer = null;
+      }, 250);
+
       used=true;
       lockFramePassed=false;   // ⚠️ 刚下注，还不能解锁
     }else{
