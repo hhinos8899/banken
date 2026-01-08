@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>方案 C · 自动解锁播报版</title>
+<title>方案 C · 下一把到来才解锁播报</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 body{margin:0;background:#0b0c0f;color:#e9eef8;font-family:system-ui}
@@ -20,9 +20,10 @@ body{margin:0;background:#0b0c0f;color:#e9eef8;font-family:system-ui}
 .box{border:1px solid #222;border-radius:12px;padding:12px;margin-top:10px}
 </style>
 </head>
+
 <body>
 <div class="wrap">
-<h2>方案 C · 自动解锁 + 女声播报</h2>
+<h2>方案 C · 下一把到来才解锁播报</h2>
 
 <div class="row">
   <button class="btn" onclick="add('B')">录入 B</button>
@@ -55,14 +56,13 @@ const THRESHOLD = 4;
 
 /* ===== 状态 ===== */
 let history = [];
-let used = false;
-let inStruct = false;
+let used = false;       // 本结构期已用过一次“可以动”
+let inStruct = false;   // 当前处于结构期（曾出现过dir）
 
-/* ===== 解锁播报状态（关键） ===== */
-let lastBannerText = "";
-let lastSaidUnlock = false;
+/* ===== “下一把到来才解锁”用到的状态 ===== */
+let prevRecentKey = "";
 
-/* ===== 女声（Edge 中文）===== */
+/* ===== 女声 TTS（Edge）===== */
 let voice = null;
 function pickVoice(){
   const v = speechSynthesis.getVoices();
@@ -71,8 +71,10 @@ function pickVoice(){
     v.find(x=>/zh/i.test(x.lang)) ||
     null;
 }
-speechSynthesis.onvoiceschanged = pickVoice;
 pickVoice();
+setTimeout(pickVoice,200);
+setTimeout(pickVoice,800);
+speechSynthesis.onvoiceschanged = pickVoice;
 
 function speak(text){
   speechSynthesis.cancel();
@@ -83,7 +85,7 @@ function speak(text){
   speechSynthesis.speak(u);
 }
 
-/* ===== 逻辑 ===== */
+/* ===== 工具 ===== */
 function lastBP(){
   return history.filter(x=>x==="B"||x==="P").slice(-SUB_WINDOW);
 }
@@ -91,84 +93,78 @@ function countBP(arr){
   return {b:arr.filter(x=>x==="B").length,p:arr.filter(x=>x==="P").length};
 }
 
+/* ===== 操作 ===== */
 function add(x){
   speechSynthesis.resume();
   history.push(x);
   render();
 }
-
 function undo(){
   history.pop();
-  used=false;
-  inStruct=false;
+  // 撤销后重新渲染即可；别强行重置used，让逻辑自然跟随当前窗口
   render();
 }
-
 function resetAll(){
   history=[];
   used=false;
   inStruct=false;
-  lastBannerText="";
-  lastSaidUnlock=false;
+  prevRecentKey="";
   render();
 }
 
+/* ===== 核心逻辑 ===== */
 function render(){
+  const banner = document.getElementById("banner");
+  const reason = document.getElementById("reason");
+
   document.getElementById("history").textContent = history.join("")||"（空）";
 
   const recent = lastBP();
   document.getElementById("recent").textContent =
     recent.length<6 ? "不足" : recent.join("");
 
-  const banner = document.getElementById("banner");
-  const reason = document.getElementById("reason");
+  // 生成“最近6把”的key（只在满6把时有效）
+  const recentKey = (recent.length === 6) ? recent.join("") : "";
+
+  // ✅ 解锁播报：必须“上一轮用过一次(used=true)”，且“下一把真的来了(最近6把变化)”
+  if (used && prevRecentKey && recentKey && recentKey !== prevRecentKey) {
+    speak("结构已解锁");
+    used = false;
+    inStruct = false;
+  }
+  if (recentKey) prevRecentKey = recentKey;  // 只有满6把才更新key
+  if (!recentKey) prevRecentKey = "";        // 不足6把时清空，避免乱触发
 
   if(recent.length<6){
     banner.className="big no";
     banner.textContent="现在：不要动";
     reason.textContent="数据不足";
-  } else {
-    const {b,p}=countBP(recent);
-    let dir=null;
-    if(b>=THRESHOLD) dir="B";
-    if(p>=THRESHOLD) dir="P";
+    return;
+  }
 
-    if(dir){
-      inStruct=true;
-      if(!used){
-        banner.className="big ok";
-        banner.textContent="可以动："+dir;
-        reason.textContent=`最近6把=${recent.join("")}  B=${b} P=${p}`;
-        setTimeout(()=>speak("可以动，下注 " + dir),250);
-        used=true;
-      }else{
-        banner.className="big no";
-        banner.textContent="现在：不要动";
-        reason.textContent="本结构期已用过一次";
-      }
+  const {b,p}=countBP(recent);
+  let dir=null;
+  if(b>=THRESHOLD) dir="B";
+  if(p>=THRESHOLD) dir="P";
+
+  if(dir){
+    inStruct=true;
+    if(!used){
+      banner.className="big ok";
+      banner.textContent="可以动："+dir;
+      reason.textContent=`最近6把=${recent.join("")}  B=${b} P=${p}`;
+      setTimeout(()=>speak("可以动，下注 " + dir),250);
+      used=true;
     }else{
       banner.className="big no";
       banner.textContent="现在：不要动";
-      reason.textContent="未达 4/6 阈值";
-    }
-  }
-
-  /* ===== 自动解锁播报（和昨天一致）===== */
-  const nowText = banner.textContent;
-  if(
-    lastBannerText.startsWith("可以动") &&
-    nowText === "现在：不要动"
-  ){
-    if(!lastSaidUnlock){
-      speak("结构已解锁");
-      lastSaidUnlock=true;
-      used=false;
-      inStruct=false;
+      reason.textContent="本结构期已用过一次";
     }
   }else{
-    lastSaidUnlock=false;
+    banner.className="big no";
+    banner.textContent="现在：不要动";
+    reason.textContent="未达 4/6 阈值";
   }
-  lastBannerText = nowText;
 }
 </script>
 </body>
