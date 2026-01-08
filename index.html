@@ -1,87 +1,143 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>方案十一 · 静态展示版</title>
-  <style>
-    body{
-      font-family: system-ui, -apple-system, Segoe UI, Arial;
-      max-width: 900px;
-      margin: 24px auto;
-      padding: 0 12px;
-      line-height: 1.5;
-    }
-    h1{margin-bottom:6px}
-    .sub{color:#666;font-size:13px;margin-bottom:16px}
-    .card{
-      border:1px solid #e5e5e5;
-      border-radius:12px;
-      padding:14px;
-      margin:14px 0;
-    }
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(6,1fr);
-      gap:6px;
-      margin-top:10px;
-    }
-    .cell{
-      border:1px solid #ddd;
-      border-radius:6px;
-      padding:10px 0;
-      text-align:center;
-      font-weight:600;
-      font-size:14px;
-    }
-    .B{background:#e6f0ff}
-    .P{background:#ffecec}
-    .T{background:#f3f3f3}
-    button{
-      margin-top:10px;
-      padding:10px 14px;
-      border-radius:8px;
-      border:1px solid #ccc;
-      background:#f7f7f7;
-      cursor:pointer;
-    }
-    button:hover{background:#eee}
-    .ok{color:#0a7}
-  </style>
+<meta charset="utf-8">
+<title>方案 C · 静态版（不联网）</title>
+<style>
+  body{background:#0e0e0e;color:#ddd;font-family:system-ui;
+    max-width:900px;margin:20px auto;padding:10px}
+  h1{color:#6cff9f}
+  button{margin:4px;padding:8px 14px;border-radius:8px;
+    border:1px solid #444;background:#1e1e1e;color:#ddd;cursor:pointer}
+  button:hover{background:#2a2a2a}
+  .ok{color:#6cff9f}
+  .no{color:#ff6c6c}
+  .box{border:1px solid #333;border-radius:12px;padding:12px;margin:12px 0}
+  pre{white-space:pre-wrap}
+</style>
 </head>
 <body>
 
-<h1>方案十一 · 静态服务器版</h1>
-<div class="sub">
-  状态：<span class="ok">纯前端 · 不依赖后端 · 静态服务器</span>
+<h1>方案 C · 静态版（完全本地）</h1>
+
+<div class="box">
+  <button onclick="add('B')">录入 B</button>
+  <button onclick="add('P')">录入 P</button>
+  <button onclick="add('T')">录入 T（和）</button>
+  <button onclick="undo()">撤销</button>
+  <button onclick="reset()" style="color:#ff6c6c">清空</button>
 </div>
 
-<div class="card">
-  <b>示例盘路（Mock 数据）</b>
-  <div class="grid" id="road"></div>
-  <button onclick="regen()">重新生成</button>
+<div class="box" id="result"></div>
+<div class="box">
+  <b>完整历史：</b>
+  <pre id="history"></pre>
 </div>
 
 <script>
-  const road = document.getElementById("road");
-  const TYPES = ["B","P","T"]; // Banker / Player / Tie
+/* ====== 参数 ====== */
+const SUB_WINDOW = 6;
+const THRESHOLD = 4;
+const KEEP = 200;
+const COOLDOWN = 0;
 
-  function draw(){
-    road.innerHTML = "";
-    for(let i=0;i<36;i++){
-      const t = TYPES[Math.floor(Math.random()*TYPES.length)];
-      const d = document.createElement("div");
-      d.className = "cell " + t;
-      d.textContent = t;
-      road.appendChild(d);
-    }
+/* ====== 状态 ====== */
+let history = [];
+let used = false;
+let inStructure = false;
+let cooldown = 0;
+
+/* ====== 工具 ====== */
+function lastN(arr,n){return arr.length>=n?arr.slice(-n):arr}
+function countBP(seq){
+  return {B:seq.filter(x=>x==="B").length,
+          P:seq.filter(x=>x==="P").length}
+}
+
+function judge(){
+  const recent = lastN(history,SUB_WINDOW);
+  if(recent.length<SUB_WINDOW)
+    return [null,`数据不足：${recent.length}/${SUB_WINDOW}`];
+
+  const {B,P} = countBP(recent);
+  const road = recent.join("");
+  if(B>=THRESHOLD)
+    return ["B",`最近6把=${road}，B=${B} ≥ ${THRESHOLD}`];
+  if(P>=THRESHOLD)
+    return ["P",`最近6把=${road}，P=${P} ≥ ${THRESHOLD}`];
+  if(B===P)
+    return [null,`最近6把=${road}，3:3 持平`];
+  return [null,`最近6把=${road}，偏向不够硬`];
+}
+
+function beep(){
+  try{
+    const ctx=new AudioContext();
+    const o=ctx.createOscillator();
+    o.frequency.value=900;
+    o.connect(ctx.destination);
+    o.start();setTimeout(()=>o.stop(),150);
+  }catch(e){}
+}
+
+/* ====== 主逻辑 ====== */
+function add(x){
+  if(!["B","P","T"].includes(x))return;
+  history.push(x);
+  history=history.slice(-KEEP);
+  if(cooldown>0) cooldown--;
+
+  const [dir,reason]=judge();
+  const nowStructure = dir!==null;
+
+  if(inStructure && !nowStructure){
+    inStructure=false;
+    used=false;
+  }
+  if(!inStructure && nowStructure){
+    inStructure=true;
   }
 
-  function regen(){
-    draw();
+  let out="";
+
+  if(dir && !used && cooldown===0){
+    out+=`<div class="ok">✅ 可以动：下注 ${dir}</div>`;
+    out+=`<div>${reason}</div>`;
+    used=true;
+    if(COOLDOWN>0) cooldown=COOLDOWN;
+    beep();
+  }else{
+    out+=`<div class="no">⛔ 不要动</div>`;
+    out+=`<div>${reason}</div>`;
+    if(used && inStructure)
+      out+=`<div>补充：本结构期机会已用</div>`;
   }
 
-  draw();
+  render(out);
+}
+
+function undo(){
+  if(history.length){
+    history.pop();
+    used=false;
+    inStructure=false;
+    cooldown=0;
+    render("已撤销上一把");
+  }
+}
+
+function reset(){
+  history=[];
+  used=false;
+  inStructure=false;
+  cooldown=0;
+  render("已清空");
+}
+
+function render(msg){
+  document.getElementById("result").innerHTML=msg;
+  document.getElementById("history").textContent=history.join("");
+}
 </script>
 
 </body>
